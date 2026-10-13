@@ -1,0 +1,1204 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenCV et NumPy : comment un ordinateur voit-il une image ?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- Tokens ---------- */
+:root{
+  --paper:#f4f7fa; --grid:#dde5ed; --grid2:#c4d0dd;
+  --ink:#14213d; --muted:#4a5878; --card:#ffffff;
+  --blue:#2f6df6; --green:#12a36b; --red:#ef476f; --amber:#ffc933;
+  --ok:#0e8a5a; --bad:#d7264f;
+  --part:var(--blue); --part-ink:#fff;
+  --radius:8px;
+  --font:'Inter','Segoe UI',Arial,system-ui,sans-serif;
+  --display:'Space Grotesk','Inter','Segoe UI',Arial,sans-serif;
+  --mono:'IBM Plex Mono','JetBrains Mono',Consolas,'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:var(--font);color:var(--ink);font-size:clamp(15px,1.25vw,19px);line-height:1.65;
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--grid2) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid2) 1px,transparent 1px),
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:140px 140px,140px 140px,28px 28px,28px 28px;
+}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+/* ---------- Slides ---------- */
+#deck{position:fixed;inset:0}
+.slide{
+  position:absolute;inset:0;
+  padding:clamp(12px,2.6vh,30px) clamp(22px,4.5vw,76px) 74px;
+  display:flex;flex-direction:column;gap:clamp(8px,1.5vh,16px);
+  overflow-y:auto;overflow-x:hidden;
+  opacity:0;visibility:hidden;transform:translateX(24px);
+  transition:opacity .3s,transform .3s,visibility 0s .3s;
+}
+.slide.past{transform:translateX(-24px)}
+.slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .3s,transform .3s}
+.slide::before{content:"";position:fixed;inset-block:0;inset-inline-start:0;width:10px;background:var(--part)}
+.p1{--part:var(--blue);--part-ink:#fff}
+.p2{--part:var(--green);--part-ink:#fff}
+.p3{--part:var(--red);--part-ink:#fff}
+.p4{--part:var(--amber);--part-ink:var(--ink)}
+
+.tab{align-self:flex-start;background:var(--part);color:var(--part-ink);font-weight:700;font-size:.8rem;padding:.1em .8em;border-radius:4px}
+h1,h2{font-family:var(--display);font-weight:700;line-height:1.25}
+h1{font-size:clamp(2.2rem,5.6vw,4.8rem)}
+h2{font-size:clamp(1.45rem,3vw,2.35rem)}
+h3{font-size:1.05rem;font-weight:700}
+.lead{font-size:clamp(1rem,1.5vw,1.3rem);color:var(--muted);max-width:62ch}
+.note{font-size:.9rem;color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(12px,2vw,30px);align-items:start;min-height:0}
+.cols.w{grid-template-columns:1.15fr 1fr}
+.cols.n{grid-template-columns:1fr 1.15fr}
+.stack{display:flex;flex-direction:column;gap:clamp(8px,1.4vh,14px)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+@media (max-width:900px){.cols,.cols.w,.cols.n{grid-template-columns:1fr}}
+
+/* ---------- Components ---------- */
+.panel{background:var(--card);border:1.5px solid var(--ink);border-radius:var(--radius);padding:clamp(10px,1.8vh,18px)}
+.panel.soft{border-color:var(--grid2)}
+.btn{background:#fff;border:1.5px solid var(--ink);border-radius:6px;padding:.25em .9em;font-weight:500;line-height:1.5}
+.btn:hover{background:var(--paper)}
+.btn.on{background:var(--part);color:var(--part-ink);border-color:var(--part);font-weight:700}
+.chip{font:600 .85em var(--mono);border:1.5px solid var(--ink);padding:.05em .55em;border-radius:4px;background:#fff;direction:ltr;unicode-bidi:isolate;display:inline-block}
+.cb{background:var(--blue);border-color:var(--blue);color:#fff}
+.cg{background:var(--green);border-color:var(--green);color:#fff}
+.cr{background:var(--red);border-color:var(--red);color:#fff}
+.ca{background:var(--amber);border-color:var(--amber);color:var(--ink)}
+canvas.img{width:100%;height:auto;display:block;border:1.5px solid var(--ink);border-radius:4px;background:#000;box-shadow:5px 5px 0 var(--ink)}
+.px{image-rendering:pixelated}
+.stage{width:min(100%,56vh);aspect-ratio:4/3;display:grid;place-items:center;background:#0b1020;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden;box-shadow:5px 5px 0 var(--ink);position:relative}
+.stage canvas{display:block}
+.stage.sm{width:min(100%,42vh)}
+canvas.img.fit{width:min(100%,56vh)}
+.imgwrap.fit{width:min(100%,56vh)}
+.imgwrap{position:relative}
+label.ctl{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-weight:500}
+input[type=range]{width:100%;accent-color:var(--part)}
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:.25em .65em;font-weight:500}
+.seg button+button{border-inline-start:1.5px solid var(--ink)}
+.seg button.on{background:var(--ink);color:#fff}
+.warn{border-inline-start:6px solid var(--amber);background:#fff8dc;padding:.5em .9em;border-radius:4px}
+.good{border-inline-start:6px solid var(--green);background:#e9f8f1;padding:.5em .9em;border-radius:4px}
+
+/* code */
+pre.code{direction:ltr;text-align:left;unicode-bidi:isolate;background:var(--ink);color:#e8edf9;border-radius:6px;padding:.7em 1em;overflow:auto;white-space:pre;font:400 clamp(.74rem,1.05vw,.95rem)/1.6 var(--mono)}
+pre.code .c{color:#8a9bc0;font-style:italic}pre.code .s{color:#ffd166}pre.code .k{color:#ff8fab}pre.code .n{color:#7ee0b0}pre.code .f{color:#8ec5ff}
+
+/* ---------- Hero ---------- */
+.hero-grid{flex:1;display:grid;grid-template-columns:1.1fr 1fr;gap:clamp(16px,3vw,48px);align-items:center}
+@media (max-width:900px){.hero-grid{grid-template-columns:1fr}}
+.hero-txt{display:flex;flex-direction:column;gap:clamp(10px,2vh,20px)}
+.keys{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:.9rem}
+kbd{font:600 .8em var(--mono);border:1.5px solid var(--ink);border-bottom-width:3px;border-radius:4px;padding:0 .4em;background:#fff;color:var(--ink)}
+
+/* flip cards */
+.flips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.flips{grid-template-columns:repeat(2,1fr)}}
+.flip{perspective:900px;background:none;border:0;padding:0;height:clamp(130px,24vh,190px)}
+.flip .in{position:relative;width:100%;height:100%;transition:transform .55s;transform-style:preserve-3d}
+.flip.flipped .in{transform:rotateY(180deg)}
+.flip .fa,.flip .fb{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1.5px solid var(--ink);border-radius:var(--radius);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px;text-align:center}
+.flip .fa{background:#fff;font-weight:700}
+.flip .fa .flip-icon{width:58px;height:58px;display:grid;place-items:center;color:var(--blue);border:1.5px solid var(--blue);border-radius:14px;background:#eff5ff;flex-shrink:0}
+.flip .fa .flip-icon svg{display:block;width:36px;height:36px}
+.flip .fb{background:var(--part);color:var(--part-ink);transform:rotateY(180deg);font-size:.95rem;font-weight:500}
+.facts{display:flex;flex-wrap:wrap;gap:10px}
+
+/* pixel grid */
+.pxgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;direction:ltr;touch-action:none;user-select:none;width:min(100%,46vh);background:var(--ink);padding:2px;border-radius:4px}
+.pxgrid .cell{aspect-ratio:1;display:grid;place-items:center;font:600 clamp(.6rem,1.15vw,.9rem) var(--mono);cursor:crosshair}
+
+/* color */
+.swatch{height:clamp(80px,16vh,140px);border:1.5px solid var(--ink);border-radius:6px;box-shadow:5px 5px 0 var(--ink)}
+.bars{display:grid;gap:6px;direction:ltr}
+.bar{height:16px;background:var(--grid);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0}
+
+/* inspect */
+.mark{position:absolute;width:16px;height:16px;border:2px solid var(--amber);outline:2px solid var(--ink);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none}
+.dimline{position:absolute;opacity:0;transition:opacity .2s;pointer-events:none;background:var(--amber)}
+.dimline span{position:absolute;background:var(--ink);color:#fff;font-weight:700;font-size:.8rem;padding:0 .6em;border-radius:3px;white-space:nowrap}
+.dimline.w{top:6px;left:6px;right:6px;height:4px}.dimline.w span{top:8px;left:50%;transform:translateX(-50%)}
+.dimline.h{top:6px;bottom:6px;right:6px;width:4px}.dimline.h span{right:10px;top:50%;transform:translateY(-50%)}
+.dimline.c{bottom:6px;left:6px;right:6px;height:4px;background:linear-gradient(90deg,var(--blue),var(--green),var(--red))}.dimline.c span{bottom:8px;left:50%;transform:translateX(-50%)}
+#inWrap[data-hl=w] .dimline.w,#inWrap[data-hl=h] .dimline.h,#inWrap[data-hl=c] .dimline.c{opacity:1}
+.shape{display:flex;align-items:stretch;gap:6px;direction:ltr;flex-wrap:wrap;font-family:var(--mono);font-size:1.7rem;font-weight:600}
+.shape .par{align-self:center}
+.dim{border:1.5px solid var(--ink);border-radius:6px;background:#fff;padding:.1em .6em;display:flex;flex-direction:column;align-items:center;min-width:5.5em}
+.dim b{font-size:1.5rem}.dim small{font:500 .72rem var(--font);direction:ltr;color:var(--muted)}
+.dim:hover,.dim:focus-visible{background:var(--amber)}
+
+/* who */
+.task{font-family:var(--display);font-size:clamp(1.3rem,2.5vw,2rem);font-weight:700;min-height:2.6em;display:flex;align-items:center}
+.libs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.lib{border:1.5px solid var(--ink);background:#fff;border-radius:6px;padding:.6em .4em;font:600 1rem var(--mono);display:flex;flex-direction:column;gap:2px;align-items:center}
+.lib small{font:500 .78rem var(--font);color:var(--muted)}
+.lib.ok{background:var(--ok);color:#fff;border-color:var(--ok)}.lib.ok small{color:#e3fff3}
+.lib.bad{background:var(--bad);color:#fff;border-color:var(--bad)}.lib.bad small{color:#ffe3ea}
+.roles{display:grid;gap:12px}
+.roles div{display:grid;grid-template-columns:7.2em 1fr;gap:10px;align-items:baseline}
+
+/* steppers */
+.sts{display:grid;gap:8px}
+.st{text-align:start;background:#fff;border:1.5px solid var(--grid2);border-radius:6px;padding:.4em .8em;display:flex;flex-direction:column;gap:2px}
+.st code{font:500 .78rem var(--mono);direction:ltr;text-align:left;color:var(--muted);white-space:pre-wrap;word-break:break-all}
+.st.done{border-color:var(--ink)}
+.st.on{background:var(--part);color:var(--part-ink);border-color:var(--part)}.st.on code{color:#ffe3ea}
+.stackwrap{position:relative;width:max-content;max-width:100%;margin:12px auto 22px}
+.stackwrap .sheet{position:absolute;inset:0;border:1.5px dashed var(--ink);border-radius:4px;opacity:0;transition:opacity .3s,transform .3s}
+.stackwrap.batch .sheet.a{opacity:.7;transform:translate(14px,-14px)}
+.stackwrap.batch .sheet.b{opacity:.4;transform:translate(28px,-28px)}
+.stackwrap canvas{position:relative;display:block;height:clamp(120px,24vh,210px);width:auto;border:1.5px solid var(--ink);border-radius:4px;background:#000}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.95rem}
+.kv dt{color:var(--muted)}.kv dd{font-family:var(--mono);direction:ltr;text-align:left}
+.shape.sm{font-size:1.2rem}
+.shape.sm .t{padding:0 .3em;border-radius:4px}
+.shape.sm .t.chg{background:var(--amber)}
+
+/* case */
+.drop{display:flex;align-items:center;justify-content:center;text-align:center;border:2px dashed var(--ink);border-radius:var(--radius);padding:.9em;background:#fff;cursor:pointer;font-weight:500}
+.drop.over{background:var(--amber)}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:end}
+.trio figure{display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;font-size:.85rem;color:var(--muted)}
+.trio canvas{width:100%;max-height:22vh;object-fit:contain;border:1.5px solid var(--ink);border-radius:4px;background:#000}
+
+/* conv */
+.kgrid{display:grid;grid-template-columns:repeat(3,4.2em);gap:4px;direction:ltr}
+.kgrid input{width:100%;font:600 .9rem var(--mono);text-align:center;border:1.5px solid var(--ink);border-radius:4px;padding:.2em 0;background:#fff}
+.g3{display:grid;grid-template-columns:repeat(3,3.4em);gap:3px;direction:ltr;font:500 .85rem var(--mono);text-align:center}
+.g3 i{font-style:normal;border:1px solid var(--grid2);padding:.1em 0;background:#fff}
+.g3.k i{border-color:var(--ink)}
+.mark2{position:absolute;width:14px;height:14px;border:2px solid var(--amber);outline:2px solid var(--ink);transform:translate(-50%,-50%);pointer-events:none}
+
+/* quiz */
+.opts{display:grid;gap:8px}
+.opt{text-align:start;background:#fff;border:1.5px solid var(--ink);border-radius:6px;padding:.5em .9em;font-weight:500}
+.opt:hover{background:var(--paper)}
+.opt.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.opt.bad{background:var(--bad);color:#fff;border-color:var(--bad)}
+.qq{font-family:var(--display);font-size:clamp(1.25rem,2.3vw,1.9rem);font-weight:700}
+
+/* wrap-up */
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;direction:ltr}
+.flow .sep{color:var(--muted);font-weight:700}
+.flow button{font:600 .9rem var(--mono);border:1.5px solid var(--ink);background:#fff;border-radius:6px;padding:.3em .7em}
+.flow button.on{background:var(--amber)}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset-inline:0;bottom:0;z-index:20;display:flex;align-items:center;gap:12px;padding:10px clamp(16px,3vw,40px);background:var(--paper);border-top:1.5px solid var(--ink)}
+#ticks{flex:1;display:flex;gap:3px;height:22px}
+.tick{flex:1;border:0;padding:0;border-radius:3px;background:var(--tc);opacity:.35}
+.tick.seen{opacity:.7}.tick.cur{opacity:1;outline:2px solid var(--ink);outline-offset:1px}
+.tick[data-p="1"]{--tc:var(--blue)}.tick[data-p="2"]{--tc:var(--green)}.tick[data-p="3"]{--tc:var(--red)}.tick[data-p="4"]{--tc:var(--amber)}
+.nav{background:#fff;border:1.5px solid var(--ink);border-radius:6px;padding:.15em .9em;font-weight:700;font-size:.9rem}
+.nav:hover{background:var(--amber)}
+#count{font:600 .85rem var(--mono);color:var(--muted);min-width:4.5em;text-align:center}
+
+@media (prefers-reduced-motion:reduce){
+  .slide,.slide.active,.flip .in,.dimline,.stackwrap .sheet{transition:none}
+}
+</style>
+</head>
+<body>
+
+<main id="deck">
+
+<!-- 1 ───────── Hero -->
+<section class="slide p1" data-id="hero">
+  <div class="tab">Comprendre les images</div>
+  <div class="hero-grid">
+    <div class="hero-txt">
+      <h1>Comment un ordinateur voit-il une image ?</h1>
+      <p class="lead">Un atelier pratique pour apprendre <b class="ltr">OpenCV</b> et <b class="ltr">NumPy</b> à partir de zéro, puis préparer une image pour un modèle de deep learning. Chaque diapositive propose une expérience interactive.</p>
+      <div class="facts">
+        <span class="chip cb">Charger et comprendre</span><span class="chip cg">Transformer</span><span class="chip cr">Préparer pour le modèle</span>
+      </div>
+      <p class="keys"><span><kbd>→</kbd> Suivant</span><span><kbd>←</kbd> Précédent</span><span><kbd>F</kbd> Plein écran</span><span>Ou cliquez sur la barre de navigation en bas</span></p>
+    </div>
+    <div class="stack">
+      <canvas id="heroCv" class="img fit" width="400" height="300" aria-label="Image basse résolution avec une loupe révélant l’image d’origine"></canvas>
+      <p class="note">Déplacez la souris sur l’image. Dans le cercle, découvrez l’originale (400 × 300 pixels) ; à l’extérieur, sa version réduite à 40 × 30 pixels.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 ───────── What is OpenCV -->
+<section class="slide p1" data-id="what">
+  <div class="tab">Comprendre les images</div>
+  <h2>Qu’est-ce qu’OpenCV ?</h2>
+  <p class="lead"><b class="ltr">Open Source Computer Vision Library</b> : une bibliothèque open source de vision par ordinateur qui permet de lire et d’analyser des images et des vidéos.</p>
+  <div class="facts">
+    <span class="chip">Lancée vers 2000</span>
+    <span class="chip">Plus de 2 500 algorithmes</span>
+    <span class="chip">C++, Python et Java</span>
+    <span class="chip">Gratuite</span>
+  </div>
+  <h3>Où est-elle utilisée ? Cliquez sur les cartes pour les retourner</h3>
+  <div class="flips">
+    <button class="flip"><div class="in"><div class="fa"><span class="flip-icon"><svg class="lucide-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M9 16c1 .7 2 1 3 1s2-.3 3-1"/></svg></span>Détection des visages</div><div class="fb">Déverrouillage facial et mise au point automatique sur les visages.</div></div></button>
+    <button class="flip"><div class="in"><div class="fa"><span class="flip-icon"><svg class="lucide-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 17l-1 3"/><path d="M19 17l1 3"/><path d="M5 17H4a2 2 0 0 1-2-2v-3l2-6a2 2 0 0 1 2-1h12a2 2 0 0 1 2 1l2 6v3a2 2 0 0 1-2 2H5Z"/><path d="M4 11h16"/><path d="M7 14h.01"/><path d="M17 14h.01"/></svg></span>Conduite autonome</div><div class="fb">Détection des voies, des piétons et des panneaux.</div></div></button>
+    <button class="flip"><div class="in"><div class="fa"><span class="flip-icon"><svg class="lucide-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3.5 12h3.7l2-3 3 6 2-3h6"/></svg></span>Imagerie médicale</div><div class="fb">Amélioration et analyse assistée des images médicales.</div></div></button>
+    <button class="flip"><div class="in"><div class="fa"><span class="flip-icon"><svg class="lucide-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M6 6h1M17 6h1M6 17h1M14 14h3v3h-3zM21 14v2M18 20h3M14 21v-2"/></svg></span>Codes QR</div><div class="fb">Localisation et lecture d’un code dans l’image.</div></div></button>
+  </div>
+  <p class="note">Dans cet atelier, commençons par l’essentiel : représenter, modifier et préparer une image.</p>
+</section>
+
+<!-- 3 ───────── Pixels -->
+<section class="slide p1" data-id="pixels">
+  <div class="tab">Comprendre les images</div>
+  <h2>Une image est un tableau de nombres</h2>
+  <p class="lead">Chaque petit carré est un pixel. En niveaux de gris, il correspond à une valeur entre 0 (noir) et 255 (blanc). Dessinez avec la souris et observez les nombres changer.</p>
+  <div class="cols">
+    <div class="stack">
+      <div id="pxGrid" class="pxgrid" aria-label="Grille de pixels 8 × 8"></div>
+      <label class="ctl">Valeur du pinceau <input id="pxBrush" type="range" min="0" max="255" value="255"><b id="pxBrushV" class="chip">255</b></label>
+      <div class="row" id="pxPresets">
+        <button class="btn" data-p="heart">Cœur</button><button class="btn" data-p="smile">Visage</button><button class="btn" data-p="grad">Dégradé</button><button class="btn" data-p="rand">Aléatoire</button><button class="btn" data-p="clear">Effacer</button>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="row" style="align-items:flex-end">
+        <canvas id="pxPrev" class="px" width="8" height="8" style="width:112px;height:112px;border:1.5px solid var(--ink);box-shadow:5px 5px 0 var(--ink)"></canvas>
+        <div class="stack" style="gap:6px"><span class="chip">shape = (8, 8)</span><span class="chip">dtype = uint8</span><span class="note">Voici l’image à sa taille réelle : seulement 64 nombres.</span></div>
+      </div>
+      <pre class="code" id="pxArr"></pre>
+      <p class="note">C’est exactement ce que stocke NumPy : un tableau à deux dimensions, avec des lignes et des colonnes.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4 ───────── Color pixel -->
+<section class="slide p1" data-id="color">
+  <div class="tab">Comprendre les images</div>
+  <h2>Un pixel en couleur : trois nombres</h2>
+  <p class="lead">Une couleur mélange du rouge, du vert et du bleu. Chaque canal varie de 0 à 255. Déplacez les curseurs et observez l’ordre utilisé par OpenCV.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="swatch" id="cSw"></div>
+      <label class="ctl"><span class="chip cr">R Rouge</span><input id="cR" type="range" min="0" max="255" value="255"><b id="cRv" class="chip">255</b></label>
+      <label class="ctl"><span class="chip cg">G Vert</span><input id="cG" type="range" min="0" max="255" value="165"><b id="cGv" class="chip">165</b></label>
+      <label class="ctl"><span class="chip cb">B Bleu</span><input id="cB" type="range" min="0" max="255" value="0"><b id="cBv" class="chip">0</b></label>
+      <div class="row" id="cPre">
+        <button class="btn" data-c="255,165,0">Orange</button><button class="btn" data-c="128,0,128">Violet</button><button class="btn" data-c="255,255,0">Jaune</button><button class="btn" data-c="0,200,200">Turquoise</button><button class="btn" data-c="255,255,255">Blanc</button>
+      </div>
+    </div>
+    <div class="stack">
+      <pre class="code" id="cCode"></pre>
+      <div class="warn">OpenCV stocke les canaux dans l’ordre <b class="ltr">B, G, R</b> et non <b class="ltr">R, G, B</b>. C’est une différence essentielle à retenir.</div>
+      <p class="note" id="cInfo"></p>
+    </div>
+  </div>
+</section>
+
+<!-- 5 ───────── Inspect -->
+<section class="slide p1" data-id="inspect">
+  <div class="tab">Comprendre les images</div>
+  <h2>Explorer l’image : <span class="ltr">shape</span>, <span class="ltr">dtype</span> et <span class="ltr">min / max</span></h2>
+  <div class="cols w">
+    <div class="stack">
+      <div class="imgwrap fit" id="inWrap" data-hl="">
+        <canvas id="inCv" class="img" width="400" height="300" style="touch-action:none"></canvas>
+        <div class="mark" id="inMark" hidden></div>
+        <div class="dimline w"><span>Largeur</span></div>
+        <div class="dimline h"><span>Hauteur</span></div>
+        <div class="dimline c"><span>3 canaux</span></div>
+      </div>
+      <div class="panel soft" id="inOut" style="min-height:3.6em">Cliquez sur un point de l’image pour lire les valeurs de son pixel.</div>
+    </div>
+    <div class="stack">
+      <pre class="code" id="inCode"></pre>
+      <p class="note">Survolez les dimensions pour les repérer sur l’image :</p>
+      <div class="shape" id="inShape">
+        <span class="par">(</span>
+        <button class="dim" data-d="h"><b>300</b><small>Hauteur : nombre de lignes</small></button><span class="par">,</span>
+        <button class="dim" data-d="w"><b>400</b><small>Largeur : nombre de colonnes</small></button><span class="par">,</span>
+        <button class="dim" data-d="c"><b>3</b><small>Canaux : B, G et R</small></button>
+        <span class="par">)</span>
+      </div>
+      <div class="good"><span class="ltr">uint8</span> correspond à 8 bits, soit 2<sup>8</sup> = 256 valeurs possibles entre 0 et 255.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ───────── BGR vs RGB -->
+<section class="slide p1" data-id="bgr">
+  <div class="tab">Comprendre les images</div>
+  <h2>BGR ou RGB ? Le piège classique</h2>
+  <div class="cols">
+    <div class="stack">
+      <canvas id="bgCv" class="img fit" width="400" height="300"></canvas>
+      <p class="note">Désactivez un ou plusieurs canaux pour voir leur contribution à l’image.</p>
+    </div>
+    <div class="stack">
+      <p class="lead">OpenCV lit les images dans l’ordre <b class="ltr">B-G-R</b>, alors que Matplotlib attend <b class="ltr">R-G-B</b>. Découvrez ce qui se passe si l’on oublie la conversion.</p>
+      <div class="seg" id="bgSeg"><button class="on" data-s="0">Avec cvtColor (correct)</button><button data-s="1">Sans conversion (incorrect)</button></div>
+      <div class="row" id="bgCh">
+        <label class="chip cb"><input type="checkbox" data-ch="b" checked> [:, :, 0] ← B</label>
+        <label class="chip cg"><input type="checkbox" data-ch="g" checked> [:, :, 1] ← G</label>
+        <label class="chip cr"><input type="checkbox" data-ch="r" checked> [:, :, 2] ← R</label>
+      </div>
+      <pre class="code" id="bgCode"></pre>
+      <div class="warn" id="bgNote"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 ───────── Who does what -->
+<section class="slide p1" data-id="who">
+  <div class="tab">Comprendre les images</div>
+  <h2>Qui fait quoi ?</h2>
+  <p class="lead">Trois bibliothèques, trois rôles. Choisissez celle qui correspond à chaque tâche.</p>
+  <div class="cols n">
+    <div class="panel stack">
+      <div class="note">Tâche <b id="gN">1</b> sur <span id="gT">8</span> ; bonnes réponses : <b id="gS">0</b></div>
+      <div class="task" id="gTask"></div>
+      <div class="libs" id="gLibs">
+        <button class="lib" data-lib="cv2">cv2<small>OpenCV</small></button>
+        <button class="lib" data-lib="np">np<small>NumPy</small></button>
+        <button class="lib" data-lib="plt">plt<small>Matplotlib</small></button>
+      </div>
+      <div id="gFb" style="min-height:3.4em"></div>
+      <div><button class="btn on" id="gNext" hidden>Tâche suivante</button></div>
+    </div>
+    <div class="panel soft roles">
+      <div><span class="chip cb">cv2</span><span>Vision par ordinateur : lire, redimensionner, convertir les couleurs, retourner et filtrer les images.</span></div>
+      <div><span class="chip cg">np</span><span>Manipulation des tableaux : min, max, découpage, division et ajout de dimensions.</span></div>
+      <div><span class="chip ca">plt</span><span>Affichage et visualisation : imshow, show et subplots.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 ───────── Resize -->
+<section class="slide p2" data-id="resize">
+  <div class="tab">Transformations</div>
+  <h2>Redimensionner : <span class="ltr">cv2.resize</span></h2>
+  <div class="cols">
+    <div class="stack">
+      <div class="stage sm"><canvas id="rzOrg" width="400" height="300" style="width:100%"></canvas></div>
+      <p class="note">Original : <span class="chip">400 × 300</span></p>
+    </div>
+    <div class="stack">
+      <div class="stage sm"><canvas id="rzOut" class="px"></canvas></div>
+      <p class="note" id="rzInfo"></p>
+    </div>
+  </div>
+  <div class="cols">
+    <div class="stack">
+      <label class="ctl">Largeur <input id="rzW" type="range" min="8" max="400" value="224"><b id="rzWv" class="chip">224</b></label>
+      <label class="ctl">Hauteur <input id="rzH" type="range" min="8" max="300" value="224"><b id="rzHv" class="chip">224</b></label>
+      <div class="row" id="rzPre"><button class="btn" data-s="224,224">224×224</button><button class="btn" data-s="128,128">128×128</button><button class="btn" data-s="64,64">64×64</button><button class="btn" data-s="32,32">32×32</button><span class="seg" id="rzSeg"><button class="on" data-m="1">Lissé</button><button data-m="0">Net</button></span></div>
+    </div>
+    <div class="stack">
+      <pre class="code" id="rzCode"></pre>
+      <div class="warn">L’ordre des paramètres est ici <b class="ltr">(width, height)</b> contrairement à <span class="ltr">shape</span> qui renvoie <b class="ltr">(height, width)</b>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 ───────── Crop -->
+<section class="slide p2" data-id="crop">
+  <div class="tab">Transformations</div>
+  <h2>Recadrage : pas de fonction <span class="ltr">crop</span> ; on utilise l’indexation NumPy</h2>
+  <p class="lead">Tracez un rectangle en faisant glisser la souris sur l’image et observez les indices entre <span class="ltr">[ ]</span> changer.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="imgwrap fit" id="crWrap" style="touch-action:none;cursor:crosshair;overflow:hidden;border:1.5px solid var(--ink);border-radius:4px;box-shadow:5px 5px 0 var(--ink)">
+        <canvas id="crSrc" width="400" height="300" style="width:100%;display:block"></canvas>
+        <div id="crBox" style="position:absolute;border:2px dashed var(--amber);box-shadow:0 0 0 9999px rgba(8,13,31,.55)"></div>
+      </div>
+      <div class="row"><button class="btn" id="crPre">Centre : de 20 % à 80 %</button><button class="btn" id="crAll">Image entière</button></div>
+    </div>
+    <div class="stack">
+      <div class="stage"><canvas id="crOut"></canvas></div>
+      <pre class="code" id="crCode"></pre>
+      <p class="note">L’indexation <span class="ltr">[y, x]</span> signifie [lignes, colonnes]. L’origine se trouve en haut à gauche.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10 ───────── Playground -->
+<section class="slide p2" data-id="play">
+  <div class="tab">Transformations</div>
+  <h2>Niveaux de gris, retournement et rotation</h2>
+  <div class="cols">
+    <div class="stack">
+      <canvas id="pgCv" class="img fit" width="400" height="300"></canvas>
+      <p class="note" id="pgShape"></p>
+    </div>
+    <div class="stack">
+      <div class="row"><b>Niveaux de gris</b><div class="seg" id="pgGray"><button class="on" data-g="0">Couleur</button><button data-g="1">Gris</button></div></div>
+      <div class="row"><b class="ltr">cv2.flip</b><div class="seg" id="pgFlip"><button class="on" data-f="n">Aucun</button><button data-f="1">1 Horizontal</button><button data-f="0">0 Vertical</button><button data-f="-1">-1 Les deux</button></div></div>
+      <label class="ctl"><b>Rotation</b><input id="pgAng" type="range" min="-180" max="180" value="0" step="5"><b id="pgAngV" class="chip">0°</b></label>
+      <div class="row"><button class="btn" data-a="90">90°</button><button class="btn" data-a="180">180°</button><button class="btn" data-a="0">Réinitialiser</button></div>
+      <pre class="code" id="pgCode"></pre>
+      <p class="note" id="pgNote">Niveau de gris = <span class="ltr">0.299·R + 0.587·G + 0.114·B</span>, car l’œil humain est plus sensible au vert.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 11 ───────── Normalization -->
+<section class="slide p3" data-id="norm">
+  <div class="tab">Préparation au deep learning</div>
+  <h2>Normalisation et piège du <span class="ltr">uint8</span></h2>
+  <div class="cols">
+    <div class="panel stack">
+      <h3>Pourquoi diviser par 255 ?</h3>
+      <label class="ctl">Valeur du pixel <input id="nV" type="range" min="0" max="255" value="128"><b id="nVv" class="chip">128</b></label>
+      <div class="row" style="align-items:stretch">
+        <div id="nSw" style="width:90px;min-height:70px;border:1.5px solid var(--ink);border-radius:4px"></div>
+        <div class="stack" style="gap:2px;justify-content:center"><span class="chip" id="nOut"></span><span class="note">Même niveau de gris, mais à une échelle standardisée entre 0 et 1.</span></div>
+      </div>
+      <p>Des valeurs normalisées favorisent un entraînement plus stable et peuvent accélérer la convergence.</p>
+    </div>
+    <div class="panel stack">
+      <h3>Pourquoi convertir en <span class="ltr">float32</span> d’abord ?</h3>
+      <label class="ctl">a <input id="oA" type="range" min="0" max="255" value="250"><b id="oAv" class="chip">250</b></label>
+      <label class="ctl">b <input id="oB" type="range" min="0" max="255" value="10"><b id="oBv" class="chip">10</b></label>
+      <pre class="code" id="oCode"></pre>
+      <div class="warn" id="oNote"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 ───────── Prep stepper -->
+<section class="slide p3" data-id="prep">
+  <div class="tab">Préparation au deep learning</div>
+  <h2>Étape 3 : préparer une image pour un modèle de deep learning</h2>
+  <div class="cols n">
+    <div class="stack">
+      <div class="sts" id="stList"></div>
+      <div class="row"><button class="btn" id="stPrev">Étape précédente</button><button class="btn on" id="stNext">Étape suivante</button></div>
+    </div>
+    <div class="panel stack">
+      <div class="stackwrap" id="stStack"><div class="sheet a"></div><div class="sheet b"></div><canvas id="stCv" class="px"></canvas></div>
+      <div class="shape sm" id="stShape"></div>
+      <dl class="kv" id="stKv"></dl>
+      <p class="note" id="stNote"></p>
+    </div>
+  </div>
+</section>
+
+<!-- 13 ───────── Case study -->
+<section class="slide p3" data-id="case">
+  <div class="tab">Préparation au deep learning</div>
+  <h2>Étape 4 : exemple pratique sur une nouvelle image</h2>
+  <p class="lead">Essayez avec votre image : importez-la, inspectez ses dimensions, redimensionnez-la, normalisez-la et convertissez-la en niveaux de gris.</p>
+  <div class="cols w">
+    <div class="stack">
+      <div class="trio">
+        <figure><canvas id="csOrg" class="px"></canvas><figcaption>Originale</figcaption></figure>
+        <figure><canvas id="csRes" class="px" width="64" height="64"></canvas><figcaption>64×64</figcaption></figure>
+        <figure><canvas id="csGray" class="px" width="64" height="64"></canvas><figcaption>En gris et normalisée</figcaption></figure>
+      </div>
+      <label class="drop" id="csDrop">Glissez une image ici ou cliquez pour en choisir une sur votre ordinateur<input id="csFile" type="file" accept="image/*" hidden></label>
+      <div class="row"><button class="btn on" data-i="flower">Image de fleur 250 × 250</button><button class="btn" data-i="scene">Paysage 400 × 300</button></div>
+    </div>
+    <div class="stack">
+      <pre class="code" id="csLog"></pre>
+      <pre class="code" id="csMat"></pre>
+      <p class="note">L’image reste sur votre appareil : tout le traitement est effectué dans le navigateur.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 14 ───────── Convolution -->
+<section class="slide p3" data-id="conv">
+  <div class="tab">Préparation au deep learning</div>
+  <h2>Comment fonctionne un CNN ? Des filtres glissent sur l’image</h2>
+  <p class="lead">Chaque nouveau pixel est la somme des produits entre les pixels voisins et les coefficients du filtre. Survolez l’image en gris pour voir le calcul.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="row" style="align-items:flex-start;flex-wrap:nowrap">
+        <div class="imgwrap" style="flex:1"><canvas id="cvIn" class="img" width="400" height="300" style="touch-action:none"></canvas><div class="mark2" id="cvMi" hidden></div></div>
+        <div class="imgwrap" style="flex:1"><canvas id="cvOut" class="img" width="400" height="300"></canvas><div class="mark2" id="cvMo" hidden></div></div>
+      </div>
+      <div class="row" id="cvPre"><button class="btn on" data-k="blur">Flou</button><button class="btn" data-k="sharpen">Renforcement</button><button class="btn" data-k="edges">Contours</button><button class="btn" data-k="sobel">Contours verticaux</button><button class="btn" data-k="emboss">Relief</button><button class="btn" data-k="identity">Identité</button></div>
+    </div>
+    <div class="stack">
+      <div class="row" style="align-items:flex-start">
+        <div class="stack" style="gap:4px"><b>Filtre (modifiable)</b><div class="kgrid" id="kGrid"></div></div>
+        <div class="stack" style="gap:4px"><b>Pixels sous le filtre</b><div class="g3" id="cvPatch"></div></div>
+      </div>
+      <div class="panel soft" id="cvRes" style="min-height:3.6em">Survolez l’image de gauche.</div>
+      <p class="note">Le réseau apprend lui-même les coefficients de centaines de filtres, sans qu’on ait à les programmer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 15 ───────── Why CNN -->
+<section class="slide p3" data-id="why">
+  <div class="tab">Préparation au deep learning</div>
+  <h2>Pourquoi les CNN sont-ils adaptés aux images ?</h2>
+  <div class="cols">
+    <div class="panel stack">
+      <h3>Combien de poids ? Choisissez une taille d’image</h3>
+      <div class="row" id="wyS"><button class="btn" data-s="28">28</button><button class="btn" data-s="64">64</button><button class="btn" data-s="128">128</button><button class="btn on" data-s="224">224</button><button class="btn" data-s="512">512</button></div>
+      <div class="roles">
+        <div><span class="chip cr">Dense</span><span id="wyD"></span></div>
+        <div><span class="chip cg">Conv</span><span id="wyC"></span></div>
+      </div>
+      <div class="good" id="wyR"></div>
+    </div>
+    <div class="stack">
+      <div class="panel soft"><h3>Connexions locales</h3><span class="note">Chaque filtre examine une petite zone : les pixels voisins sont liés.</span></div>
+      <div class="panel soft"><h3>Poids partagés</h3><span class="note">Un même filtre parcourt toute l’image et réduit fortement le nombre de paramètres.</span></div>
+      <div class="panel soft"><h3>Équivariance à la translation</h3><span class="note">Un motif peut être détecté à différents endroits de l’image.</span></div>
+      <div class="panel soft"><h3>Apprentissage hiérarchique</h3><span class="note">Contours, formes, parties d’objets, puis objets complets.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 16 ───────── Quiz -->
+<section class="slide p4" data-id="quiz">
+  <div class="tab">Révision</div>
+  <h2>Testez vos connaissances</h2>
+  <div class="panel stack" style="max-width:860px">
+    <div class="note">Question <b id="qP">1 / 6</b></div>
+    <div class="qq" id="qQ"></div>
+    <div class="opts" id="qO"></div>
+    <div id="qFb" style="min-height:3em"></div>
+    <div><button class="btn on" id="qNext" hidden>Question suivante</button></div>
+  </div>
+</section>
+
+<!-- 17 ───────── Wrap-up -->
+<section class="slide p4" data-id="wrap">
+  <div class="tab">Révision</div>
+  <h2>Récapitulatif : le pipeline de prétraitement</h2>
+  <p class="lead">Cliquez sur une étape pour revoir son rôle.</p>
+  <div class="flow" id="fl">
+    <button data-t="imread">imread</button><span class="sep">›</span>
+    <button data-t="resize">resize</button><span class="sep">›</span>
+    <button data-t="cvt">cvtColor</button><span class="sep">›</span>
+    <button data-t="f32">astype(float32) / 255</button><span class="sep">›</span>
+    <button data-t="exp">expand_dims</button><span class="sep">›</span>
+    <button data-t="model">model.predict</button>
+  </div>
+  <div class="good" id="flT" style="min-height:3em"></div>
+  <div class="cols">
+    <div class="stack">
+      <pre class="code" id="wrCode">import cv2, numpy as np, matplotlib.pyplot as plt
+
+img   = cv2.imread('a.jpg')                  # BGR, uint8
+print(img.shape, img.dtype, img.min(), img.max())
+rgb   = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # pour plt.imshow
+gray  = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+small = cv2.resize(img, (224, 224))          # (largeur, hauteur)
+crop  = img[y1:y2, x1:x2]                    # Découpage NumPy
+flip  = cv2.flip(img, 1)                     # 1 | 0 | -1
+x     = small.astype(np.float32) / 255.0     # [0, 1]
+batch = np.expand_dims(x, axis=0)            # (1, H, W, C)</pre>
+      <div class="row"><button class="btn on" id="wrCopy">Copier le code</button></div>
+    </div>
+    <div class="panel stack" style="align-self:center">
+      <h2 style="font-size:clamp(1.6rem,3.4vw,2.8rem)">Merci à toutes et à tous !</h2>
+      <p class="lead">Des questions ?</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav id="hud" aria-label="Navigation entre les diapositives">
+  <button class="nav" id="prev">Précédent</button>
+  <div id="ticks"></div>
+  <span id="count"></span>
+  <button class="nav" id="fs">Plein écran</button>
+  <button class="nav" id="next">Suivant</button>
+</nav>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= Helpers ================= */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+const cx = c => c.getContext('2d', { willReadFrequently: true });
+const fmt = n => n.toLocaleString('en-US');
+
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function hl(src) {
+  return esc(src).replace(
+    /(#.*$)|("[^"\n]*"|'[^'\n]*')|\b(import|as|def|return|if|is|None|for|in|print)\b|\b(\d+(?:\.\d+)?)\b|\b([A-Za-z_][\w.]*)(?=\()/gm,
+    (m, c, s, k, n, f) =>
+      c ? `<span class="c">${c}</span>` :
+      s ? `<span class="s">${s}</span>` :
+      k ? `<span class="k">${k}</span>` :
+      n ? `<span class="n">${n}</span>` :
+          `<span class="f">${f}</span>`);
+}
+const setCode = (el, text) => { el.innerHTML = hl(text); };
+
+/* ================= Sample images (drawn with canvas) ================= */
+function circ(x, X, Y, R, f) { x.fillStyle = f; x.beginPath(); x.arc(X, Y, R, 0, Math.PI * 2); x.fill(); }
+function poly(x, pts, f) { x.fillStyle = f; x.beginPath(); x.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) x.lineTo(pts[i][0], pts[i][1]); x.closePath(); x.fill(); }
+
+function sceneMain() {
+  const W = 400, H = 300, c = mk(W, H), x = cx(c);
+  let g = x.createLinearGradient(0, 0, 0, 190); g.addColorStop(0, '#1d4ed8'); g.addColorStop(1, '#93c5fd');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const rg = x.createRadialGradient(312, 70, 4, 312, 70, 78);
+  rg.addColorStop(0, 'rgba(255,240,170,.9)'); rg.addColorStop(.4, 'rgba(251,146,60,.45)'); rg.addColorStop(1, 'rgba(251,146,60,0)');
+  x.fillStyle = rg; x.fillRect(220, 0, 180, 160);
+  circ(x, 312, 70, 28, '#f97316');
+  [[70, 60, 1], [160, 38, .8], [240, 92, .6]].forEach(([a, b, s]) => {
+    [[0, 0, 22], [22, 6, 18], [-22, 7, 16], [8, -8, 16]].forEach(([dx, dy, r]) => circ(x, a + dx * s, b + dy * s, r * s, '#ffffff'));
+  });
+  poly(x, [[0, 190], [60, 120], [110, 170], [170, 100], [240, 180], [300, 130], [400, 190], [400, 300], [0, 300]], '#4c3b8f');
+  poly(x, [[0, 215], [90, 170], [200, 205], [310, 165], [400, 210], [400, 300], [0, 300]], '#22a559');
+  x.fillStyle = '#15803d'; x.fillRect(0, 235, W, 65);
+  x.fillStyle = '#dc2626'; x.fillRect(90, 170, 110, 75);
+  poly(x, [[80, 172], [145, 120], [210, 172]], '#7f1d1d');
+  x.fillStyle = '#fbbf24'; x.fillRect(135, 200, 26, 45);
+  x.fillStyle = '#000000'; x.fillRect(100, 185, 22, 20);
+  x.fillStyle = '#78350f'; x.fillRect(284, 190, 12, 55);
+  circ(x, 290, 175, 30, '#166534'); circ(x, 274, 190, 20, '#16a34a'); circ(x, 308, 192, 20, '#16a34a');
+  return c;
+}
+function sceneFlower() {
+  const W = 250, H = 250, c = mk(W, H), x = cx(c);
+  const g = x.createRadialGradient(125, 125, 10, 125, 125, 190); g.addColorStop(0, '#6d28d9'); g.addColorStop(1, '#1e1b4b');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#16a34a'; x.fillRect(120, 140, 10, 110);
+  poly(x, [[125, 200], [175, 175], [160, 215]], '#22c55e');
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; circ(x, 125 + Math.cos(a) * 42, 110 + Math.sin(a) * 42, 26, '#fb7185'); }
+  circ(x, 125, 110, 28, '#facc15');
+  return c;
+}
+const SCENE = sceneMain(), FLOWER = sceneFlower();
+const SDATA = cx(SCENE).getImageData(0, 0, 400, 300);
+let SMIN = 255, SMAX = 0;
+for (let i = 0; i < SDATA.data.length; i++) { if (i % 4 === 3) continue; const v = SDATA.data[i]; if (v < SMIN) SMIN = v; if (v > SMAX) SMAX = v; }
+
+/* ================= Deck navigation ================= */
+const slides = $$('.slide');
+const ids = slides.map(s => s.dataset.id);
+const INIT = {}, ENTER = {};
+const inited = new Set(), seen = new Set();
+let cur = 0;
+const ticksEl = $('#ticks');
+slides.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.className = 'tick';
+  b.dataset.p = s.className.match(/p(\d)/)[1];
+  b.title = `${i + 1}`;
+  b.setAttribute('aria-label', `Diapositive ${i + 1}`);
+  b.onclick = () => go(i);
+  ticksEl.appendChild(b);
+});
+function go(i) {
+  i = clamp(i, 0, slides.length - 1);
+  cur = i; seen.add(i);
+  slides.forEach((s, k) => { s.classList.toggle('active', k === i); s.classList.toggle('past', k < i); });
+  $$('.tick').forEach((t, k) => { t.classList.toggle('cur', k === i); t.classList.toggle('seen', seen.has(k) && k !== i); });
+  $('#count').textContent = `${i + 1} / ${slides.length}`;
+  const id = ids[i];
+  if (!inited.has(id)) { inited.add(id); INIT[id] && INIT[id](); }
+  ENTER[id] && ENTER[id]();
+  slides[i].scrollTop = 0;
+  try { history.replaceState(null, '', '#' + (i + 1)); } catch (e) { /* file:// restrictions */ }
+}
+const next = () => go(cur + 1), prev = () => go(cur - 1);
+$('#next').onclick = next; $('#prev').onclick = prev;
+$('#fs').onclick = () => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); };
+addEventListener('keydown', e => {
+  const t = e.target;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (t.matches && t.matches('input[type=range]') && e.key.startsWith('Arrow')) return;
+  if (t.matches && t.matches('input[type=number],input[type=text],textarea,select')) return;
+  if (e.key === ' ' && t.tagName === 'BUTTON') return;
+  switch (e.key) {
+    case 'ArrowRight': case 'PageDown': case ' ': e.preventDefault(); next(); break;
+    case 'ArrowLeft': case 'PageUp': e.preventDefault(); prev(); break;
+    case 'Home': go(0); break;
+    case 'End': go(slides.length - 1); break;
+    case 'f': case 'F': $('#fs').click(); break;
+  }
+});
+document.addEventListener('change', e => { if (e.target.type === 'range') e.target.blur(); });
+let tx = 0, ty = 0, tOk = false;
+$('#deck').addEventListener('touchstart', e => { tOk = !e.target.closest('canvas,input,pre,.pxgrid,#crWrap,.noswipe'); tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+$('#deck').addEventListener('touchend', e => {
+  if (!tOk) return;
+  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+  if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) { dx < 0 ? prev() : next(); }
+}, { passive: true });
+addEventListener('resize', () => { ENTER[ids[cur]] && ENTER[ids[cur]](); });
+
+/* ================= 1. Hero ================= */
+let heroOn = false, heroStart = () => {};
+INIT.hero = () => {
+  const cv = $('#heroCv'), c = cv.getContext('2d');
+  const low = mk(40, 30); cx(low).drawImage(SCENE, 0, 0, 40, 30);
+  let mx = 200, my = 150, idle = true; const t0 = performance.now();
+  cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mx = (e.clientX - r.left) * 400 / r.width; my = (e.clientY - r.top) * 300 / r.height; idle = false; });
+  cv.addEventListener('pointerleave', () => { idle = true; });
+  function frame(t) {
+    if (ids[cur] !== 'hero') { heroOn = false; return; }
+    let x = mx, y = my;
+    if (idle) { const k = (t - t0) / 1400; x = 200 + 140 * Math.sin(k); y = 150 + 85 * Math.sin(k * 1.7); }
+    c.imageSmoothingEnabled = false; c.drawImage(low, 0, 0, 40, 30, 0, 0, 400, 300);
+    c.save(); c.beginPath(); c.arc(x, y, 64, 0, Math.PI * 2); c.clip(); c.imageSmoothingEnabled = true; c.drawImage(SCENE, 0, 0); c.restore();
+    c.strokeStyle = '#ffc933'; c.lineWidth = 3; c.beginPath(); c.arc(x, y, 64, 0, Math.PI * 2); c.stroke();
+    requestAnimationFrame(frame);
+  }
+  heroStart = () => { if (!heroOn) { heroOn = true; requestAnimationFrame(frame); } };
+};
+ENTER.hero = () => heroStart();
+
+/* ================= 2. What is OpenCV ================= */
+INIT.what = () => { $$('.flip').forEach(b => b.addEventListener('click', () => b.classList.toggle('flipped'))); };
+
+/* ================= 3. Pixel grid ================= */
+INIT.pixels = () => {
+  const g = new Array(64).fill(0), el = $('#pxGrid'), cells = [];
+  for (let i = 0; i < 64; i++) { const d = document.createElement('div'); d.className = 'cell'; d.dataset.i = i; el.appendChild(d); cells.push(d); }
+  const brush = $('#pxBrush'), bv = $('#pxBrushV'), pv = $('#pxPrev'), pc = cx(pv), arr = $('#pxArr');
+  function draw() {
+    cells.forEach((d, i) => { const v = g[i]; d.textContent = v; d.style.background = `rgb(${v},${v},${v})`; d.style.color = v > 128 ? '#14213d' : '#e8edf9'; });
+    const id = pc.createImageData(8, 8);
+    g.forEach((v, i) => { id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = 255; });
+    pc.putImageData(id, 0, 0);
+    let s = '';
+    for (let r = 0; r < 8; r++) s += (r === 0 ? '[' : ' ') + '[' + g.slice(r * 8, r * 8 + 8).map(v => String(v).padStart(3)).join(' ') + ']' + (r < 7 ? '\n' : ']');
+    setCode(arr, s);
+  }
+  const P = {
+    heart: ['.##..##.', '########', '########', '########', '.######.', '..####..', '...##...', '........'],
+    smile: ['..####..', '.#....#.', '#.#..#.#', '#......#', '#.#..#.#', '#..##..#', '.#....#.', '..####..']
+  };
+  const fromPat = rows => rows.join('').split('').map(ch => ch === '#' ? 255 : 0);
+  function preset(p) {
+    if (p === 'heart' || p === 'smile') fromPat(P[p]).forEach((v, i) => g[i] = v);
+    else if (p === 'grad') g.forEach((_, i) => g[i] = Math.min(255, i * 4));
+    else if (p === 'rand') g.forEach((_, i) => g[i] = Math.floor(Math.random() * 256));
+    else g.fill(0);
+    draw();
+  }
+  let painting = false;
+  const paint = t => { const d = t && t.closest ? t.closest('.cell') : null; if (d) { g[+d.dataset.i] = +brush.value; draw(); } };
+  el.addEventListener('pointerdown', e => { painting = true; el.setPointerCapture && el.setPointerCapture(e.pointerId); paint(e.target); e.preventDefault(); });
+  el.addEventListener('pointermove', e => { if (painting) paint(document.elementFromPoint(e.clientX, e.clientY)); });
+  addEventListener('pointerup', () => painting = false);
+  addEventListener('pointercancel', () => painting = false);
+  brush.addEventListener('input', () => bv.textContent = brush.value);
+  $$('#pxPresets button').forEach(b => b.addEventListener('click', () => preset(b.dataset.p)));
+  preset('heart');
+};
+
+/* ================= 4. Color pixel ================= */
+INIT.color = () => {
+  const R = $('#cR'), G = $('#cG'), B = $('#cB');
+  function upd() {
+    const r = +R.value, g = +G.value, b = +B.value;
+    $('#cSw').style.background = `rgb(${r},${g},${b})`;
+    $('#cRv').textContent = r; $('#cGv').textContent = g; $('#cBv').textContent = b;
+    setCode($('#cCode'), `# Ce que nous voyons (R, G, B)\nrgb = (${r}, ${g}, ${b})\n\n# Ce que stocke OpenCV (B, G, R)\nimg[y, x] = [${b}, ${g}, ${r}]`);
+    const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+    $('#cInfo').innerHTML = `Code hexadécimal : <span class="chip">${hex}</span>. Nombre de couleurs possibles : 256 × 256 × 256 = <span class="chip">16,777,216</span>`;
+  }
+  [R, G, B].forEach(i => i.addEventListener('input', upd));
+  $$('#cPre button').forEach(b => b.addEventListener('click', () => { const [r, g, bl] = b.dataset.c.split(',').map(Number); R.value = r; G.value = g; B.value = bl; upd(); }));
+  upd();
+};
+
+/* ================= 5. Inspect ================= */
+INIT.inspect = () => {
+  const cv = $('#inCv'); cx(cv).drawImage(SCENE, 0, 0);
+  setCode($('#inCode'), `print(image_bgr.shape)  # (300, 400, 3)\nprint(image_bgr.dtype)  # uint8\nprint(image_bgr.min())  # ${SMIN}\nprint(image_bgr.max())  # ${SMAX}`);
+  const mark = $('#inMark'), out = $('#inOut'), d = SDATA.data;
+  function pick(e) {
+    const r = cv.getBoundingClientRect();
+    const x = clamp(Math.floor((e.clientX - r.left) * 400 / r.width), 0, 399), y = clamp(Math.floor((e.clientY - r.top) * 300 / r.height), 0, 299);
+    const i = (y * 400 + x) * 4, rr = d[i], gg = d[i + 1], bb = d[i + 2];
+    mark.style.left = ((x + .5) / 400 * 100) + '%'; mark.style.top = ((y + .5) / 300 * 100) + '%'; mark.hidden = false;
+    out.innerHTML = `<div class="row"><span class="chip">image_bgr[${y}, ${x}]</span><span class="chip cb">B ${bb}</span><span class="chip cg">G ${gg}</span><span class="chip cr">R ${rr}</span><span style="display:inline-block;width:34px;height:22px;border:1.5px solid var(--ink);border-radius:4px;background:rgb(${rr},${gg},${bb})"></span></div>`;
+  }
+  cv.addEventListener('pointermove', pick); cv.addEventListener('pointerdown', pick);
+  const wrap = $('#inWrap');
+  $$('#inShape .dim').forEach(b => {
+    const on = () => wrap.dataset.hl = b.dataset.d, off = () => wrap.dataset.hl = '';
+    b.addEventListener('mouseenter', on); b.addEventListener('focus', on); b.addEventListener('mouseleave', off); b.addEventListener('blur', off);
+    b.addEventListener('click', on);
+  });
+};
+
+/* ================= 6. BGR vs RGB ================= */
+INIT.bgr = () => {
+  const cv = $('#bgCv'), c = cx(cv), out = c.createImageData(400, 300);
+  let swap = false; const on = { b: true, g: true, r: true };
+  function render() {
+    const s = SDATA.data, o = out.data;
+    for (let i = 0; i < s.length; i += 4) {
+      const R = on.r ? s[i] : 0, G = on.g ? s[i + 1] : 0, B = on.b ? s[i + 2] : 0;
+      if (swap) { o[i] = B; o[i + 1] = G; o[i + 2] = R; } else { o[i] = R; o[i + 1] = G; o[i + 2] = B; }
+      o[i + 3] = 255;
+    }
+    c.putImageData(out, 0, 0);
+    setCode($('#bgCode'), swap
+      ? `# Tableau BGR affiché comme du RGB\nplt.imshow(image_bgr)`
+      : `image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)\nplt.imshow(image_rgb)`);
+    const n = $('#bgNote');
+    n.className = swap ? 'warn' : 'good';
+    n.innerHTML = swap ? 'Les couleurs sont incorrectes : le ciel devient orange et la maison bleue, car le rouge et le bleu ont été inversés.' : 'Les couleurs sont correctes. Effectuez cette conversion avant chaque <span class="ltr">plt.imshow</span>.';
+  }
+  $$('#bgSeg button').forEach(b => b.addEventListener('click', () => { swap = b.dataset.s === '1'; $$('#bgSeg button').forEach(x => x.classList.toggle('on', x === b)); render(); }));
+  $$('#bgCh input').forEach(i => i.addEventListener('change', () => { on[i.dataset.ch] = i.checked; render(); }));
+  render();
+};
+
+/* ================= 7. Who does what ================= */
+INIT.who = () => {
+  const T = [
+    ['Lire une image depuis le disque', 'cv2', 'La fonction cv2.imread lit le fichier et renvoie un tableau.'],
+    ['Calculer les valeurs minimale et maximale des pixels', 'np', 'min et max sont des opérations sur un tableau NumPy.'],
+    ['Redimensionner une image à 224 × 224', 'cv2', 'La fonction cv2.resize.'],
+    ['Recadrer une partie de l’image', 'np', 'Le recadrage utilise l’indexation img[y1:y2, x1:x2], sans fonction crop dédiée.'],
+    ['Convertir une image en niveaux de gris', 'cv2', 'cv2.cvtColor avec COLOR_BGR2GRAY.'],
+    ['Diviser par 255 pour normaliser les valeurs', 'np', 'Une opération vectorisée sur l’ensemble du tableau, sans boucle.'],
+    ['Ajouter une dimension de lot (batch)', 'np', 'np.expand_dims ajoute une dimension.'],
+    ['Afficher une image dans le notebook', 'plt', 'plt.imshow puis plt.show : Matplotlib sert à visualiser.']
+  ];
+  let i = 0, score = 0, answered = false;
+  const fb = $('#gFb'), nx = $('#gNext'), libs = $$('#gLibs .lib');
+  $('#gT').textContent = T.length;
+  function show() {
+    answered = false; libs.forEach(l => l.className = 'lib'); fb.innerHTML = ''; nx.hidden = true;
+    $('#gTask').textContent = T[i][0]; $('#gN').textContent = i + 1; $('#gS').textContent = score;
+    $('#gLibs').hidden = false;
+  }
+  libs.forEach(b => b.addEventListener('click', () => {
+    if (answered) return; answered = true;
+    const ok = b.dataset.lib === T[i][1]; if (ok) score++;
+    b.classList.add(ok ? 'ok' : 'bad');
+    if (!ok) libs.find(l => l.dataset.lib === T[i][1]).classList.add('ok');
+    fb.innerHTML = `<b>${ok ? 'Correct !' : 'Réponse incorrecte.'}</b> ${T[i][2]}`;
+    $('#gS').textContent = score; nx.hidden = false; nx.textContent = i === T.length - 1 ? 'Afficher le résultat' : 'Tâche suivante';
+  }));
+  let finished = false;
+  nx.addEventListener('click', () => {
+    if (finished) { finished = false; i = 0; score = 0; show(); return; }
+    if (i < T.length - 1) { i++; show(); }
+    else { finished = true; $('#gTask').textContent = `Résultat : ${score} sur ${T.length}`; $('#gLibs').hidden = true; fb.textContent = ''; nx.textContent = 'Rejouer'; }
+  });
+  show();
+};
+
+/* ================= 8. Resize ================= */
+INIT.resize = () => {
+  cx($('#rzOrg')).drawImage(SCENE, 0, 0);
+  const W = $('#rzW'), H = $('#rzH'), out = $('#rzOut'), stage = out.parentElement;
+  let smooth = true;
+  function render() {
+    const w = +W.value, h = +H.value;
+    out.width = w; out.height = h;
+    const c = out.getContext('2d'); c.imageSmoothingEnabled = smooth; c.imageSmoothingQuality = 'high'; c.drawImage(SCENE, 0, 0, 400, 300, 0, 0, w, h);
+    const bw = stage.clientWidth || 300, bh = stage.clientHeight || 225, sc = Math.min(bw / w, bh / h);
+    out.style.width = (w * sc) + 'px'; out.style.height = (h * sc) + 'px';
+    $('#rzWv').textContent = w; $('#rzHv').textContent = h;
+    setCode($('#rzCode'), `img_resized = cv2.resize(image_bgr, (${w}, ${h}))\n# img_resized.shape -> (${h}, ${w}, 3)`);
+    const ratio = (w / h).toFixed(2), r0 = (400 / 300).toFixed(2);
+    $('#rzInfo').innerHTML = `Résultat : <span class="chip">${w} × ${h}</span>, soit <span class="chip">${fmt(w * h * 3)}</span> valeurs au lieu de <span class="chip">360 000</span>. ${ratio !== r0 ? 'Attention : le rapport largeur/hauteur a changé et l’image est déformée.' : 'Les proportions sont conservées.'}`;
+  }
+  [W, H].forEach(i => i.addEventListener('input', render));
+  $$('#rzPre button[data-s]').forEach(b => b.addEventListener('click', () => { const [w, h] = b.dataset.s.split(',').map(Number); W.value = w; H.value = h; render(); }));
+  $$('#rzSeg button').forEach(b => b.addEventListener('click', () => { smooth = b.dataset.m === '1'; $$('#rzSeg button').forEach(x => x.classList.toggle('on', x === b)); render(); }));
+  ENTER.resize = render;
+};
+
+/* ================= 9. Crop ================= */
+INIT.crop = () => {
+  const src = $('#crSrc'), box = $('#crBox'), out = $('#crOut'), wrap = $('#crWrap');
+  cx(src).drawImage(SCENE, 0, 0);
+  let sel = { x1: 80, y1: 60, x2: 320, y2: 240 };
+  function render() {
+    if (sel.x2 - sel.x1 < 4) { sel.x2 = Math.min(400, sel.x1 + 4); sel.x1 = sel.x2 - 4; }
+    if (sel.y2 - sel.y1 < 4) { sel.y2 = Math.min(300, sel.y1 + 4); sel.y1 = sel.y2 - 4; }
+    const { x1, y1, x2, y2 } = sel, w = x2 - x1, h = y2 - y1;
+    box.style.left = (x1 / 4) + '%'; box.style.top = (y1 / 3) + '%'; box.style.width = (w / 4) + '%'; box.style.height = (h / 3) + '%';
+    out.width = w; out.height = h; cx(out).drawImage(SCENE, x1, y1, w, h, 0, 0, w, h);
+    const s0 = (src.clientWidth || 400) / 400; out.style.width = (w * s0) + 'px'; out.style.height = (h * s0) + 'px';
+    setCode($('#crCode'), `h, w, _ = image_bgr.shape     # 300, 400, 3\nimg_cropped = image_bgr[${y1}:${y2}, ${x1}:${x2}]\n# img_cropped.shape -> (${h}, ${w}, 3)`);
+  }
+  const toImg = e => { const r = src.getBoundingClientRect(); return { x: clamp(Math.round((e.clientX - r.left) * 400 / r.width), 0, 400), y: clamp(Math.round((e.clientY - r.top) * 300 / r.height), 0, 300) }; };
+  let st = null;
+  wrap.addEventListener('pointerdown', e => { st = toImg(e); wrap.setPointerCapture && wrap.setPointerCapture(e.pointerId); sel = { x1: st.x, x2: st.x, y1: st.y, y2: st.y }; render(); });
+  wrap.addEventListener('pointermove', e => { if (!st) return; const p = toImg(e); sel = { x1: Math.min(st.x, p.x), x2: Math.max(st.x, p.x), y1: Math.min(st.y, p.y), y2: Math.max(st.y, p.y) }; render(); });
+  const end = () => { st = null; }; wrap.addEventListener('pointerup', end); wrap.addEventListener('pointercancel', end);
+  $('#crPre').addEventListener('click', () => { sel = { x1: 80, y1: 60, x2: 320, y2: 240 }; render(); });
+  $('#crAll').addEventListener('click', () => { sel = { x1: 0, y1: 0, x2: 400, y2: 300 }; render(); });
+  ENTER.crop = render;
+};
+
+/* ================= 10. Gray / flip / rotate ================= */
+INIT.play = () => {
+  const cv = $('#pgCv'), c = cx(cv);
+  let gray = false, flip = 'n', ang = 0;
+  function render() {
+    c.save(); c.fillStyle = '#000'; c.fillRect(0, 0, 400, 300);
+    c.translate(200, 150); c.rotate(-ang * Math.PI / 180);
+    if (flip === '1') c.scale(-1, 1); else if (flip === '0') c.scale(1, -1); else if (flip === '-1') c.scale(-1, -1);
+    c.drawImage(SCENE, -200, -150); c.restore();
+    if (gray) {
+      const id = c.getImageData(0, 0, 400, 300), d = id.data;
+      for (let i = 0; i < d.length; i += 4) { const v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; d[i] = d[i + 1] = d[i + 2] = v; }
+      c.putImageData(id, 0, 0);
+    }
+    const L = ['img = image_bgr'];
+    if (flip !== 'n') L.push(`img = cv2.flip(img, ${flip})`);
+    if (ang !== 0) { L.push('h, w = img.shape[:2]'); L.push(`M = cv2.getRotationMatrix2D((w // 2, h // 2), ${ang}, 1.0)`); L.push('img = cv2.warpAffine(img, M, (w, h))'); }
+    if (gray) L.push('img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)');
+    L.push(`# img.shape -> ${gray ? '(300, 400)' : '(300, 400, 3)'}`);
+    setCode($('#pgCode'), L.join('\n'));
+    $('#pgShape').innerHTML = `Forme actuelle : <span class="chip">${gray ? '(300, 400)' : '(300, 400, 3)'}</span> ${gray ? 'La dimension des canaux disparaît : chaque pixel n’est plus qu’un nombre.' : ''}`;
+    $('#pgAngV').textContent = ang + '°';
+  }
+  $$('#pgGray button').forEach(b => b.addEventListener('click', () => { gray = b.dataset.g === '1'; $$('#pgGray button').forEach(x => x.classList.toggle('on', x === b)); render(); }));
+  $$('#pgFlip button').forEach(b => b.addEventListener('click', () => { flip = b.dataset.f; $$('#pgFlip button').forEach(x => x.classList.toggle('on', x === b)); render(); }));
+  const A = $('#pgAng'); A.addEventListener('input', () => { ang = +A.value; render(); });
+  $$('button[data-a]').forEach(b => b.addEventListener('click', () => { ang = +b.dataset.a; A.value = ang; render(); }));
+  render();
+};
+
+/* ================= 11. Normalization ================= */
+INIT.norm = () => {
+  const V = $('#nV');
+  function a() { const v = +V.value; $('#nVv').textContent = v; $('#nSw').style.background = `rgb(${v},${v},${v})`; $('#nOut').textContent = `${v} / 255 = ${(v / 255).toFixed(4)}`; }
+  V.addEventListener('input', a); a();
+  const A = $('#oA'), B = $('#oB');
+  function o() {
+    const a1 = +A.value, b1 = +B.value, sum = a1 + b1, wrapped = sum % 256;
+    $('#oAv').textContent = a1; $('#oBv').textContent = b1;
+    setCode($('#oCode'), `a = np.array([${a1}], dtype=np.uint8)\nb = np.array([${b1}], dtype=np.uint8)\na + b                      # uint8   -> [${wrapped}]\na.astype(np.float32) + b   # float32 -> [${sum}.]`);
+    const n = $('#oNote');
+    n.className = sum > 255 ? 'warn' : 'good';
+    n.textContent = sum > 255 ? `La somme dépasse 255 et déborde vers ${wrapped}. C’est pourquoi on convertit en float32 avant le calcul.` : 'Le résultat est compris entre 0 et 255. Augmentez les deux valeurs jusqu’à dépasser 255.';
+  }
+  A.addEventListener('input', o); B.addEventListener('input', o); o();
+};
+
+/* ================= 12. Prep stepper ================= */
+INIT.prep = () => {
+  const rc = mk(128, 128), rcx = cx(rc); rcx.drawImage(SCENE, 0, 0, 128, 128);
+  const RD = rcx.getImageData(0, 0, 128, 128).data;
+  let rmin = 255, rmax = 0;
+  for (let i = 0; i < RD.length; i++) { if (i % 4 === 3) continue; if (RD[i] < rmin) rmin = RD[i]; if (RD[i] > rmax) rmax = RD[i]; }
+  const f2 = v => (v / 255).toFixed(2);
+  const bgr0 = a => [a[2], a[1], a[0]], rgb0 = a => [a[0], a[1], a[2]];
+  const S = [
+    { t: 'Charger l’image', code: "image_bgr = cv2.imread('sample.jpg')", shape: [300, 400, 3], chg: [], dt: 'uint8', rng: `${SMIN} .. ${SMAX}`, order: 'BGR', big: true,
+      px: () => `[${bgr0(SDATA.data).join(', ')}]`, label: 'image_bgr[0, 0]', note: 'Image originale : des entiers entre 0 et 255 dans l’ordre B, G, R.' },
+    { t: 'Uniformiser la taille', code: 'prep_img = cv2.resize(image_bgr, (128, 128))', shape: [128, 128, 3], chg: [0, 1], dt: 'uint8', rng: `${rmin} .. ${rmax}`, order: 'BGR',
+      px: () => `[${bgr0(RD).join(', ')}]`, label: 'prep_img[0, 0]', note: 'Toutes les images passent à 128 × 128, car la couche d’entrée du modèle attend des dimensions fixes.' },
+    { t: 'De BGR vers RGB', code: 'prep_img = cv2.cvtColor(prep_img, cv2.COLOR_BGR2RGB)', shape: [128, 128, 3], chg: [], dt: 'uint8', rng: `${rmin} .. ${rmax}`, order: 'RGB',
+      px: () => `[${rgb0(RD).join(', ')}]`, label: 'prep_img[0, 0]', note: 'L’ordre des canaux change. De nombreux modèles pré-entraînés attendent des images RGB.' },
+    { t: 'Normalisation', code: 'prep_img = prep_img.astype(np.float32) / 255.0', shape: [128, 128, 3], chg: [], dt: 'float32', rng: `${f2(rmin)} .. ${f2(rmax)}`, order: 'RGB',
+      px: () => `[${rgb0(RD).map(f2).join(', ')}]`, label: 'prep_img[0, 0]', note: 'On convertit d’abord en float32, puis on divise : les valeurs sont désormais entre 0 et 1.' },
+    { t: 'Dimension de lot', code: 'tensor_img = np.expand_dims(prep_img, axis=0)', shape: [1, 128, 128, 3], chg: [0], dt: 'float32', rng: `${f2(rmin)} .. ${f2(rmax)}`, order: 'RGB', batch: true,
+      px: () => `[${rgb0(RD).map(f2).join(', ')}]`, label: 'tensor_img[0, 0, 0]', note: 'Le modèle attend un lot de forme (Batch, H, W, C). Notre lot contient une seule image.' }
+  ];
+  let k = 0, maxSeen = 0;
+  const list = $('#stList'), cv = $('#stCv');
+  S.forEach((s, i) => { const b = document.createElement('button'); b.className = 'st'; b.innerHTML = `<b>${s.t}</b><code>${esc(s.code)}</code>`; b.onclick = () => { k = i; render(); }; list.appendChild(b); });
+  function render() {
+    maxSeen = Math.max(maxSeen, k);
+    const s = S[k];
+    $$('.st', list).forEach((b, i) => { b.classList.toggle('on', i === k); b.classList.toggle('done', i < k); });
+    if (s.big) { cv.width = 400; cv.height = 300; cx(cv).drawImage(SCENE, 0, 0); } else { cv.width = 128; cv.height = 128; cx(cv).drawImage(rc, 0, 0); }
+    $('#stStack').classList.toggle('batch', !!s.batch);
+    $('#stShape').innerHTML = '<span class="par">(</span>' + s.shape.map((v, i) => `<span class="t${s.chg.includes(i) ? ' chg' : ''}">${v}</span>`).join('<span>,</span>') + '<span class="par">)</span>';
+    $('#stKv').innerHTML = `<dt>dtype</dt><dd>${s.dt}</dd><dt>min .. max</dt><dd>${s.rng}</dd><dt>Ordre des canaux</dt><dd>${s.order}</dd><dt>${s.label}</dt><dd>${s.px()}</dd>`;
+    $('#stNote').textContent = s.note;
+    $('#stPrev').disabled = k === 0; $('#stNext').disabled = k === S.length - 1;
+    $('#stPrev').style.opacity = k === 0 ? .4 : 1; $('#stNext').style.opacity = k === S.length - 1 ? .4 : 1;
+  }
+  $('#stPrev').onclick = () => { if (k > 0) { k--; render(); } };
+  $('#stNext').onclick = () => { if (k < S.length - 1) { k++; render(); } };
+  render();
+};
+
+/* ================= 13. Case study ================= */
+INIT.case = () => {
+  const oc = $('#csOrg'), rc = $('#csRes'), gc = $('#csGray'), log = $('#csLog'), mat = $('#csMat');
+  function run(src, nw, nh) {
+    const k = Math.min(1, 600 / Math.max(nw, nh));
+    oc.width = Math.max(1, Math.round(nw * k)); oc.height = Math.max(1, Math.round(nh * k));
+    const o = oc.getContext('2d'); o.fillStyle = '#fff'; o.fillRect(0, 0, oc.width, oc.height); o.drawImage(src, 0, 0, oc.width, oc.height);
+    const rctx = rc.getContext('2d'); rctx.drawImage(oc, 0, 0, 64, 64);
+    const d = rctx.getImageData(0, 0, 64, 64).data, gn = new Float32Array(64 * 64);
+    const gctx = gc.getContext('2d'), gid = gctx.createImageData(64, 64);
+    let mn = 1, mx = 0;
+    for (let i = 0; i < 4096; i++) {
+      const v = (0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) / 255; gn[i] = v;
+      if (v < mn) mn = v; if (v > mx) mx = v;
+      const p = Math.round(v * 255); gid.data[i * 4] = gid.data[i * 4 + 1] = gid.data[i * 4 + 2] = p; gid.data[i * 4 + 3] = 255;
+    }
+    gctx.putImageData(gid, 0, 0);
+    setCode(log, `Dimensions initiales : (${nh}, ${nw}, 3)\nimg_res.shape        : (64, 64, 3)\nimg_gray_norm.shape  : (64, 64)\nimg_gray_norm.dtype  : float32\nmin / max            : ${mn.toFixed(2)} / ${mx.toFixed(2)}`);
+    let m = 'img_gray_norm[:5, :5] =\n';
+    for (let r = 0; r < 5; r++) m += (r === 0 ? '[[' : ' [') + Array.from({ length: 5 }, (_, c2) => gn[r * 64 + c2].toFixed(2)).join(' ') + (r < 4 ? ']\n' : ']]');
+    setCode(mat, m);
+  }
+  function loadFile(f) {
+    if (!f || !f.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(f), im = new Image();
+    im.onload = () => { run(im, im.naturalWidth, im.naturalHeight); URL.revokeObjectURL(url); $$('button[data-i]').forEach(b => b.classList.remove('on')); };
+    im.src = url;
+  }
+  $('#csFile').addEventListener('change', e => loadFile(e.target.files[0]));
+  const drop = $('#csDrop');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+  $$('button[data-i]').forEach(b => b.addEventListener('click', () => {
+    $$('button[data-i]').forEach(x => x.classList.toggle('on', x === b));
+    const s = b.dataset.i === 'flower' ? FLOWER : SCENE; run(s, s.width, s.height);
+  }));
+  run(FLOWER, 250, 250);
+};
+
+/* ================= 14. Convolution ================= */
+INIT.conv = () => {
+  const W = 400, H = 300, G = new Float32Array(W * H), d = SDATA.data;
+  for (let i = 0; i < W * H; i++) G[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  const inC = $('#cvIn'), outC = $('#cvOut'), ictx = cx(inC), octx = cx(outC);
+  const gid = ictx.createImageData(W, H);
+  for (let i = 0; i < W * H; i++) { gid.data[i * 4] = gid.data[i * 4 + 1] = gid.data[i * 4 + 2] = G[i]; gid.data[i * 4 + 3] = 255; }
+  ictx.putImageData(gid, 0, 0);
+  const grid = $('#kGrid'), inputs = [];
+  for (let i = 0; i < 9; i++) { const inp = document.createElement('input'); inp.type = 'number'; inp.step = 'any'; grid.appendChild(inp); inputs.push(inp); inp.addEventListener('input', render); }
+  const P = {
+    identity: { k: [0, 0, 0, 0, 1, 0, 0, 0, 0], bias: 0, abs: false },
+    blur: { k: Array(9).fill(+(1 / 9).toFixed(4)), bias: 0, abs: false },
+    sharpen: { k: [0, -1, 0, -1, 5, -1, 0, -1, 0], bias: 0, abs: false },
+    edges: { k: [-1, -1, -1, -1, 8, -1, -1, -1, -1], bias: 0, abs: true },
+    sobel: { k: [-1, 0, 1, -2, 0, 2, -1, 0, 1], bias: 0, abs: true },
+    emboss: { k: [-2, -1, 0, -1, 1, 1, 0, 1, 2], bias: 128, abs: false }
+  };
+  let bias = 0, useAbs = false;
+  const kv = () => inputs.map(i => parseFloat(i.value) || 0);
+  function render() {
+    const k = kv(), o = octx.createImageData(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let s = bias;
+      for (let dy = -1; dy <= 1; dy++) { const yy = clamp(y + dy, 0, H - 1) * W; for (let dx = -1; dx <= 1; dx++) s += k[(dy + 1) * 3 + dx + 1] * G[yy + clamp(x + dx, 0, W - 1)]; }
+      if (useAbs) s = Math.abs(s);
+      const v = clamp(s, 0, 255), i = (y * W + x) * 4;
+      o.data[i] = o.data[i + 1] = o.data[i + 2] = v; o.data[i + 3] = 255;
+    }
+    octx.putImageData(o, 0, 0);
+  }
+  function choose(name) {
+    const p = P[name]; p.k.forEach((v, i) => inputs[i].value = v); bias = p.bias; useAbs = p.abs;
+    $$('#cvPre button').forEach(b => b.classList.toggle('on', b.dataset.k === name)); render();
+  }
+  $$('#cvPre button').forEach(b => b.addEventListener('click', () => choose(b.dataset.k)));
+  const miEl = $('#cvMi'), moEl = $('#cvMo'), patch = $('#cvPatch'), res = $('#cvRes');
+  inC.addEventListener('pointermove', e => {
+    const r = inC.getBoundingClientRect();
+    const x = clamp(Math.floor((e.clientX - r.left) * W / r.width), 0, W - 1), y = clamp(Math.floor((e.clientY - r.top) * H / r.height), 0, H - 1);
+    const k = kv(), p = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) p.push(G[clamp(y + dy, 0, H - 1) * W + clamp(x + dx, 0, W - 1)]);
+    let s = bias; p.forEach((v, i) => s += v * k[i]); if (useAbs) s = Math.abs(s);
+    const v = clamp(Math.round(s), 0, 255);
+    patch.innerHTML = p.map(v2 => `<i>${Math.round(v2)}</i>`).join('');
+    res.innerHTML = `Somme = Σ (pixel × filtre)${bias ? ' + ' + bias : ''} = <span class="chip">${Math.round(s)}</span> ← nouveau pixel <span class="chip ca">${v}</span>`;
+    [miEl, moEl].forEach(m => { m.hidden = false; m.style.left = ((x + .5) / W * 100) + '%'; m.style.top = ((y + .5) / H * 100) + '%'; });
+  });
+  choose('blur');
+};
+
+/* ================= 15. Why CNN ================= */
+INIT.why = () => {
+  function upd(s) {
+    const dense = s * s * 3 * 1000, conv = 3 * 3 * 3 * 64;
+    $('#wyD').innerHTML = `Couche de 1 000 neurones, image ${s}×${s}×3: <b class="ltr">${fmt(dense)}</b> poids`;
+    $('#wyC').innerHTML = `Couche avec 64 filtres 3 × 3 : <b class="ltr">${fmt(conv)}</b> poids`;
+    $('#wyR').innerHTML = `La couche convolutive utilise environ <b class="ltr">${fmt(Math.round(dense / conv))} fois</b> moins de poids. Le nombre de poids des filtres ne dépend pas de la taille de l’image.`;
+    $$('#wyS button').forEach(b => b.classList.toggle('on', +b.dataset.s === s));
+  }
+  $$('#wyS button').forEach(b => b.addEventListener('click', () => upd(+b.dataset.s)));
+  upd(224);
+};
+
+/* ================= 16. Quiz ================= */
+INIT.quiz = () => {
+  const Q = [
+    { q: 'Que représente un pixel ?', o: ['Le fichier image entier', 'La plus petite unité d’une image, portant une ou trois valeurs de couleur', 'Un cadre autour de l’image', 'Le nom d’une fonction OpenCV'], a: 1, e: 'En niveaux de gris, il possède une valeur de 0 à 255 ; en couleur, trois valeurs.' },
+    { q: 'Pourquoi redimensionner toutes les images avant de les envoyer au modèle ?', o: ['Parce que l’entrée a une taille fixe et qu’un lot standard ne peut pas contenir des images de tailles différentes', 'Pour modifier leurs couleurs', 'Parce qu’OpenCV refuse les grandes images', 'Pour les convertir en noir et blanc'], a: 0, e: 'Le modèle attend une entrée de dimensions fixes et un lot est un tableau homogène.' },
+    { q: 'Pourquoi diviser les valeurs des pixels par 255 ?', o: ['Pour rendre l’image plus claire', 'Pour compresser le fichier', 'Pour réduire les dimensions de l’image', 'Pour standardiser l’échelle et favoriser un entraînement plus stable'], a: 3, e: 'Les valeurs entre 0 et 1 peuvent rendre les gradients plus stables.' },
+    { q: 'Pourquoi les CNN sont-ils adaptés aux images ?', o: ['Parce qu’ils aplatissent l’image en une seule ligne', 'Des filtres partagés parcourent l’image et exploitent sa structure spatiale avec moins de poids', 'Parce qu’ils n’ont pas besoin de données', 'Parce qu’ils ne fonctionnent qu’en noir et blanc'], a: 1, e: 'Les filtres partagés et les connexions locales apportent une grande efficacité.' },
+    { q: 'Dans quel ordre OpenCV lit-il les canaux d’une image ?', o: ['RGB', 'GRB', 'BGR', 'RGBA'], a: 2, e: 'D’où l’utilisation de cvtColor avant l’affichage avec Matplotlib.' },
+    { q: 'Quelle est la forme du résultat de cv2.resize(img, (224, 100)) sur une image couleur ?', o: ['(224, 100, 3)', '(3, 100, 224)', '(224, 100)', '(100, 224, 3)'], a: 3, e: 'Le paramètre suit (largeur, hauteur), tandis que shape renvoie (hauteur, largeur, canaux).' }
+  ];
+  let i = 0, score = 0, done = false, finished = false;
+  const qEl = $('#qQ'), oEl = $('#qO'), fb = $('#qFb'), nx = $('#qNext'), pr = $('#qP');
+  function show() {
+    finished = false; done = false; qEl.textContent = Q[i].q; pr.textContent = `${i + 1} / ${Q.length}`; oEl.innerHTML = ''; fb.textContent = ''; nx.hidden = true;
+    Q[i].o.forEach((t, k) => { const b = document.createElement('button'); b.className = 'opt'; b.textContent = t; b.onclick = () => pick(k, b); oEl.appendChild(b); });
+  }
+  function pick(k, b) {
+    if (done) return; done = true;
+    const ok = k === Q[i].a; if (ok) score++;
+    b.classList.add(ok ? 'ok' : 'bad'); if (!ok) oEl.children[Q[i].a].classList.add('ok');
+    fb.innerHTML = `<b>${ok ? 'Correct !' : 'Réponse incorrecte.'}</b> ${Q[i].e}`;
+    nx.hidden = false; nx.textContent = i === Q.length - 1 ? 'Afficher le résultat' : 'Question suivante';
+  }
+  nx.addEventListener('click', () => {
+    if (finished) { i = 0; score = 0; show(); return; }
+    if (i < Q.length - 1) { i++; show(); return; }
+    finished = true; qEl.textContent = `Votre score : ${score} sur ${Q.length}`; oEl.innerHTML = '';
+    fb.textContent = score === Q.length ? 'Excellent ! Vous êtes prêt à présenter cet atelier.' : 'Revoyez les diapositives correspondant à vos erreurs, puis réessayez.'; nx.textContent = 'Recommencer le quiz';
+  });
+  show();
+};
+
+/* ================= 17. Wrap-up ================= */
+INIT.wrap = () => {
+  const T = {
+    imread: 'Charger une image depuis un fichier en tableau NumPy BGR. Vérifier que le résultat n’est pas None.',
+    resize: 'Uniformiser la taille, par exemple 224 × 224. Retenir l’ordre (largeur, hauteur).',
+    cvt: 'Convertir BGR en RGB, car de nombreux modèles et outils d’affichage attendent RGB.',
+    f32: 'Convertir en float32, puis diviser par 255 pour obtenir des valeurs entre 0 et 1.',
+    exp: 'Ajouter une dimension de lot pour obtenir la forme (1, H, W, C).',
+    model: 'L’image possède maintenant la forme, le type et l’échelle attendus par le modèle.'
+  };
+  const bs = $$('#fl button');
+  bs.forEach(b => b.addEventListener('click', () => { bs.forEach(x => x.classList.toggle('on', x === b)); $('#flT').textContent = T[b.dataset.t]; }));
+  bs[0].click();
+  $('#wrCopy').addEventListener('click', () => {
+    const text = $('#wrCode').textContent, btn = $('#wrCopy');
+    const done = () => { btn.textContent = 'Copié !'; setTimeout(() => btn.textContent = 'Copier le code', 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
+    else { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) { /* ignore */ } t.remove(); done(); }
+  });
+};
+
+/* ================= Boot ================= */
+$$('pre.code').forEach(p => { if (p.textContent.trim()) p.innerHTML = hl(p.textContent); });
+const startIdx = clamp((parseInt(location.hash.slice(1), 10) || 1) - 1, 0, slides.length - 1);
+go(startIdx);
+})();
+</script>
+</body>
+</html>
